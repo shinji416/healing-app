@@ -1,0 +1,1641 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Healing Player</title>
+  <style>
+    :root{
+      --bg:#050814;
+      --panel:rgba(10,16,28,.76);
+      --line:rgba(255,255,255,.10);
+      --text:#f4f7fb;
+      --muted:#b8c3d5;
+      --gold:#d8bc7a;
+      --cyan:#9fd8ff;
+      --shadow:0 22px 70px rgba(0,0,0,.42);
+    }
+
+    *{box-sizing:border-box}
+    html,body{
+      width:100%;
+      height:100%;
+      margin:0;
+      overflow:hidden;
+      color:var(--text);
+      font-family:"Inter","Hiragino Sans","Yu Gothic",sans-serif;
+      background:
+        radial-gradient(circle at 14% 16%, rgba(118,146,255,.14), transparent 26%),
+        radial-gradient(circle at 88% 10%, rgba(216,188,122,.08), transparent 24%),
+        linear-gradient(180deg,#060914 0%, #0a1120 38%, #05070d 100%);
+    }
+
+    body::before{
+      content:"";
+      position:fixed;
+      inset:0;
+      pointer-events:none;
+      background:
+        linear-gradient(135deg, rgba(255,255,255,.03), transparent 30%),
+        repeating-linear-gradient(90deg, rgba(255,255,255,.012) 0 1px, transparent 1px 120px);
+      opacity:.55;
+    }
+
+    .app{
+      display:grid;
+      grid-template-columns:minmax(0,1.6fr) 420px;
+      gap:18px;
+      height:100%;
+      padding:18px;
+    }
+
+    .stage-shell{
+      position:relative;
+      min-height:0;
+      padding:12px;
+      border-radius:30px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02)),
+        linear-gradient(145deg, rgba(216,188,122,.08), rgba(255,255,255,.02) 28%, rgba(83,126,214,.08));
+      border:1px solid rgba(255,255,255,.10);
+      box-shadow:var(--shadow);
+      overflow:hidden;
+    }
+
+    .stage{
+      position:relative;
+      width:100%;
+      height:100%;
+      border-radius:24px;
+      overflow:hidden;
+      border:1px solid rgba(255,255,255,.08);
+      background:#02060d;
+    }
+
+    canvas{
+      width:100%;
+      height:100%;
+      display:block;
+      background:#02060d;
+    }
+
+    .topbar{
+      position:absolute;
+      top:18px;
+      left:18px;
+      right:18px;
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:12px;
+      z-index:20;
+      pointer-events:none;
+    }
+
+    .brand,
+    .sign,
+    .scene-caption,
+    .status{
+      backdrop-filter:blur(16px);
+      background:linear-gradient(180deg, rgba(8,12,22,.56), rgba(8,12,22,.30));
+      border:1px solid rgba(255,255,255,.12);
+      box-shadow:0 10px 28px rgba(0,0,0,.26);
+    }
+
+    .brand{
+      padding:12px 16px;
+      border-radius:18px;
+      max-width:300px;
+      pointer-events:auto;
+    }
+
+    .brand strong{
+      display:block;
+      font-size:11px;
+      letter-spacing:.28em;
+      text-transform:uppercase;
+      color:var(--gold);
+      margin-bottom:6px;
+    }
+
+    .brand span{
+      display:block;
+      font-size:13px;
+      line-height:1.6;
+      color:rgba(244,247,251,.9);
+    }
+
+    .sign{
+      padding:6px;
+      border-radius:18px;
+      pointer-events:auto;
+      min-width:68px;
+      min-height:68px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+
+    .sign img{
+      width:56px;
+      height:56px;
+      display:block;
+      object-fit:cover;
+      border-radius:14px;
+      box-shadow:
+        0 4px 12px rgba(0,0,0,.40),
+        inset 0 1px 0 rgba(255,255,255,.28);
+      transition:filter .6s ease, box-shadow .6s ease, transform .35s ease;
+      background:#111;
+    }
+
+    .sign.beach img{
+      filter:saturate(1.10) hue-rotate(-8deg) brightness(1.06);
+      box-shadow:
+        0 6px 18px rgba(65,120,190,.35),
+        0 0 22px rgba(150,210,255,.18),
+        inset 0 1px 0 rgba(255,255,255,.28);
+    }
+
+    .sign.river img{
+      filter:saturate(.96) hue-rotate(18deg) brightness(1.03);
+      box-shadow:
+        0 6px 18px rgba(56,132,96,.32),
+        0 0 22px rgba(144,224,181,.16),
+        inset 0 1px 0 rgba(255,255,255,.28);
+    }
+
+    .sign.rainHouse img{
+      filter:saturate(.82) hue-rotate(-18deg) brightness(.95) contrast(1.04);
+      box-shadow:
+        0 6px 18px rgba(94,110,132,.34),
+        0 0 20px rgba(180,198,222,.10),
+        inset 0 1px 0 rgba(255,255,255,.24);
+    }
+
+    .sign.camp img{
+      filter:saturate(1.08) hue-rotate(-20deg) brightness(1.02) contrast(1.06);
+      box-shadow:
+        0 6px 18px rgba(182,104,42,.36),
+        0 0 24px rgba(255,173,83,.18),
+        inset 0 1px 0 rgba(255,255,255,.26);
+    }
+
+    .scene-caption{
+      position:absolute;
+      left:20px;
+      bottom:20px;
+      z-index:10;
+      width:min(650px, calc(100% - 110px));
+      padding:22px;
+      border-radius:24px;
+      overflow:hidden;
+    }
+
+    .scene-caption::before{
+      content:"";
+      position:absolute;
+      inset:0;
+      pointer-events:none;
+      background:linear-gradient(90deg, rgba(216,188,122,.18), transparent 18%);
+      opacity:.75;
+    }
+
+    .eyebrow{
+      position:relative;
+      z-index:1;
+      display:inline-flex;
+      align-items:center;
+      gap:10px;
+      margin-bottom:12px;
+      color:var(--gold);
+      font-size:11px;
+      letter-spacing:.26em;
+      text-transform:uppercase;
+    }
+
+    .eyebrow::before{
+      content:"";
+      width:38px;
+      height:1px;
+      background:linear-gradient(90deg, rgba(216,188,122,.9), transparent);
+    }
+
+    .scene-caption h1{
+      position:relative;
+      z-index:1;
+      margin:0 0 10px;
+      font-family:"Times New Roman","Hiragino Mincho ProN",serif;
+      font-size:clamp(28px,2.9vw,40px);
+      line-height:1.2;
+      font-weight:600;
+      letter-spacing:.04em;
+    }
+
+    .scene-caption p{
+      position:relative;
+      z-index:1;
+      margin:0;
+      max-width:54ch;
+      color:rgba(232,238,248,.84);
+      line-height:1.85;
+      font-size:14px;
+    }
+
+    .status{
+      position:absolute;
+      right:20px;
+      bottom:20px;
+      z-index:10;
+      padding:8px 12px;
+      border-radius:999px;
+      font-size:12px;
+      color:rgba(255,255,255,.92);
+    }
+
+    .status.ok{ border-color:rgba(136,225,188,.35); color:#d8fff0; }
+    .status.warn{ border-color:rgba(240,201,138,.35); color:#ffe9c8; }
+    .status.error{ border-color:rgba(255,158,158,.35); color:#ffd3d3; }
+
+    .panel{
+      min-height:0;
+      display:flex;
+      flex-direction:column;
+      gap:14px;
+    }
+
+    .card{
+      position:relative;
+      overflow:hidden;
+      background:
+        linear-gradient(180deg, rgba(15,20,34,.88), rgba(10,14,24,.72)),
+        radial-gradient(circle at 0% 0%, rgba(216,188,122,.08), transparent 35%);
+      border:1px solid rgba(255,255,255,.09);
+      border-radius:28px;
+      box-shadow:var(--shadow);
+      backdrop-filter:blur(18px);
+    }
+
+    .card::before{
+      content:"";
+      position:absolute;
+      inset:0;
+      pointer-events:none;
+      background:linear-gradient(180deg, rgba(255,255,255,.05), transparent 22%);
+    }
+
+    .hero{ padding:22px; }
+    .hero .mini{
+      display:inline-flex;
+      align-items:center;
+      gap:10px;
+      margin-bottom:12px;
+      color:var(--gold);
+      font-size:11px;
+      letter-spacing:.24em;
+      text-transform:uppercase;
+    }
+
+    .hero .mini::before{
+      content:"";
+      width:28px;
+      height:1px;
+      background:linear-gradient(90deg, rgba(216,188,122,.9), transparent);
+    }
+
+    .hero h2{
+      margin:0 0 12px;
+      font-family:"Times New Roman","Hiragino Mincho ProN",serif;
+      font-size:29px;
+      line-height:1.16;
+      font-weight:600;
+    }
+
+    .hero p{
+      margin:0;
+      color:var(--muted);
+      line-height:1.8;
+      font-size:14px;
+    }
+
+    .controls{
+      padding:14px;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      overflow:auto;
+    }
+
+    .toolbar{
+      display:grid;
+      grid-template-columns:1fr auto;
+      gap:10px;
+    }
+
+    button{
+      appearance:none;
+      border:none;
+      cursor:pointer;
+      transition:transform .18s ease, background .18s ease, border-color .18s ease;
+      font-family:inherit;
+    }
+
+    button:hover{ transform:translateY(-1px); }
+    button:active{ transform:translateY(0); }
+
+    .primary,.secondary{
+      min-height:50px;
+      border-radius:18px;
+      font-weight:700;
+      font-size:14px;
+      letter-spacing:.04em;
+    }
+
+    .primary{
+      color:#1d1710;
+      background:linear-gradient(135deg, rgba(244,223,172,.96), rgba(214,186,121,.98) 48%, rgba(247,231,188,.96));
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.45), 0 12px 30px rgba(164,122,44,.28);
+    }
+
+    .secondary{
+      min-width:120px;
+      color:var(--text);
+      background:linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.03));
+      border:1px solid rgba(255,255,255,.10);
+    }
+
+    .section{
+      padding:14px;
+      border-radius:22px;
+      background:linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.018));
+      border:1px solid rgba(255,255,255,.07);
+    }
+
+    .section-title{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      margin-bottom:12px;
+    }
+
+    .section-title h3{
+      margin:0;
+      font-size:13px;
+      letter-spacing:.18em;
+      color:var(--cyan);
+      text-transform:uppercase;
+      font-weight:700;
+    }
+
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 12px;
+      border-radius:999px;
+      font-size:11px;
+      letter-spacing:.06em;
+      color:var(--muted);
+      border:1px solid rgba(255,255,255,.09);
+      background:rgba(255,255,255,.03);
+      white-space:nowrap;
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+    }
+
+    .scene-btn,.preset-btn{
+      position:relative;
+      text-align:left;
+      padding:14px;
+      border-radius:20px;
+      color:var(--text);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02)),
+        radial-gradient(circle at 100% 0%, rgba(216,188,122,.08), transparent 34%);
+      border:1px solid rgba(255,255,255,.08);
+      overflow:hidden;
+    }
+
+    .scene-btn::after,.preset-btn::after{
+      content:"";
+      position:absolute;
+      inset:0;
+      background:linear-gradient(135deg, rgba(255,255,255,.06), transparent 30%, transparent 70%, rgba(255,255,255,.04));
+      opacity:.45;
+      pointer-events:none;
+    }
+
+    .scene-btn.active,.preset-btn.active{
+      border-color:rgba(216,188,122,.55);
+      background:
+        linear-gradient(180deg, rgba(216,188,122,.14), rgba(255,255,255,.03)),
+        radial-gradient(circle at 100% 0%, rgba(216,188,122,.16), transparent 38%);
+      box-shadow:inset 0 0 0 1px rgba(255,255,255,.05), 0 14px 34px rgba(150,112,38,.18);
+    }
+
+    .scene-btn strong,.preset-btn strong{
+      position:relative;
+      z-index:1;
+      display:block;
+      font-size:15px;
+      line-height:1.5;
+      margin-bottom:6px;
+      font-weight:700;
+    }
+
+    .scene-btn span,.preset-btn span{
+      position:relative;
+      z-index:1;
+      display:block;
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.6;
+    }
+
+    .master-track{
+      padding:14px 14px 10px;
+      border-radius:20px;
+      background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+      border:1px solid rgba(255,255,255,.07);
+    }
+
+    .master-head{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      color:var(--muted);
+      font-size:12px;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+      margin-bottom:10px;
+    }
+
+    .mixer{
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+
+    .track{
+      padding:13px;
+      border-radius:20px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.018)),
+        radial-gradient(circle at 100% 0%, rgba(159,216,255,.05), transparent 35%);
+      border:1px solid rgba(255,255,255,.08);
+    }
+
+    .track-top{
+      display:grid;
+      grid-template-columns:auto 1fr auto;
+      gap:12px;
+      align-items:center;
+      margin-bottom:10px;
+    }
+
+    .track label{
+      display:block;
+      font-weight:700;
+      font-size:14px;
+      margin-bottom:3px;
+    }
+
+    .track small{
+      display:block;
+      color:var(--muted);
+      line-height:1.45;
+      font-size:12px;
+    }
+
+    .tiny{
+      font-size:11px;
+      color:#8d98ab;
+      line-height:1.5;
+      margin-top:4px;
+      word-break:break-all;
+    }
+
+    .toggle{
+      position:relative;
+      width:54px;
+      height:30px;
+      border-radius:999px;
+      background:rgba(255,255,255,.10);
+      border:1px solid rgba(255,255,255,.14);
+      flex-shrink:0;
+      box-shadow:inset 0 0 12px rgba(0,0,0,.16);
+    }
+
+    .toggle::after{
+      content:"";
+      position:absolute;
+      left:3px;
+      top:3px;
+      width:22px;
+      height:22px;
+      border-radius:50%;
+      background:linear-gradient(180deg,#ffffff,#dde5f1);
+      box-shadow:0 4px 10px rgba(0,0,0,.20);
+      transition:transform .22s ease;
+    }
+
+    .toggle.on{
+      background:linear-gradient(135deg, rgba(215,188,122,.92), rgba(159,216,255,.55));
+      border-color:rgba(216,188,122,.34);
+    }
+
+    .toggle.on::after{ transform:translateX(24px); }
+
+    .value{
+      color:rgba(242,246,252,.84);
+      min-width:52px;
+      text-align:right;
+      font-variant-numeric:tabular-nums;
+      font-size:13px;
+    }
+
+    input[type="range"]{
+      width:100%;
+      height:18px;
+      background:transparent;
+      accent-color:#d8bc7a;
+      cursor:pointer;
+    }
+
+    .footer-note{
+      padding:16px 18px 18px;
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.9;
+    }
+
+    .footer-note strong{
+      display:block;
+      margin-bottom:6px;
+      color:var(--gold);
+      font-size:11px;
+      letter-spacing:.2em;
+      text-transform:uppercase;
+    }
+
+    @media (max-width:1260px){
+      html,body{ overflow:auto; }
+      .app{ grid-template-columns:1fr; height:auto; }
+      .stage-shell{ min-height:62vh; }
+    }
+
+    @media (max-width:720px){
+      .app{ padding:14px; gap:16px; }
+      .grid{ grid-template-columns:1fr; }
+      .toolbar{ grid-template-columns:1fr; }
+      .topbar{ left:14px; right:14px; top:14px; }
+      .brand{ max-width:58%; padding:10px 12px; }
+      .scene-caption{ left:14px; right:14px; width:auto; bottom:14px; padding:18px; }
+      .status{ right:14px; bottom:14px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <section class="stage-shell">
+      <div class="stage">
+        <div class="topbar">
+          <div class="brand">
+            <strong>Ambient Atelier</strong>
+            <span>星空・雨・焚き火のリアルな動きを強化した、安定再生ヒーリングプレイヤー。</span>
+          </div>
+          <div id="sceneSign" class="sign beach">
+            <img src="icon.jpeg" alt="Shinji Tsunoda icon" onerror="this.onerror=null; this.src='icon.jpg';">
+          </div>
+        </div>
+
+        <canvas id="sceneCanvas"></canvas>
+
+        <div class="scene-caption">
+          <div class="eyebrow">Real Animated Edition</div>
+          <h1 id="sceneTitle">星空が綺麗な南の島の砂浜</h1>
+          <p id="sceneDescription">静かな夜の浜辺。やわらかな波音と、空いっぱいの星のきらめき。</p>
+        </div>
+
+        <div id="statusBadge" class="status warn">音を開始してください</div>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <div class="hero card">
+        <div class="mini">Full Code</div>
+        <h2>リアルアニメ強化版</h2>
+        <p>
+          星空は流れ星と瞬き、雨は風に流れる多層の雨脚と水面の波紋、
+          焚き火は炎の揺れと火の粉を強化しています。
+          アイコンは <strong>icon.jpeg</strong> を優先し、無ければ <strong>icon.jpg</strong> を読みます。
+        </p>
+      </div>
+
+      <div class="controls card">
+        <div class="toolbar">
+          <button id="startBtn" class="primary">音を開始</button>
+          <button id="stopBtn" class="secondary">停止 / ミュート</button>
+        </div>
+
+        <div class="section">
+          <div class="section-title">
+            <h3>Scenery</h3>
+            <span class="pill">景色を選ぶと推奨トラックに切替</span>
+          </div>
+          <div class="grid" id="sceneButtons"></div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">
+            <h3>Preset Mix</h3>
+            <span class="pill">自然な組み合わせを即適用</span>
+          </div>
+          <div class="grid" id="presetButtons"></div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">
+            <h3>Master Volume</h3>
+            <span class="value" id="masterValue">80%</span>
+          </div>
+          <div class="master-track">
+            <div class="master-head">
+              <span>Overall Ambience</span>
+              <span>Stable Playback</span>
+            </div>
+            <input id="masterVolume" type="range" min="0" max="100" value="80">
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">
+            <h3>Sound Mixer</h3>
+            <span class="pill">複数同時再生</span>
+          </div>
+          <div class="mixer" id="mixer"></div>
+        </div>
+      </div>
+
+      <div class="footer-note card">
+        <strong>Files</strong>
+        index.html と同じフォルダに <strong>icon.jpeg</strong> または <strong>icon.jpg</strong>、
+        その下の <strong>audio</strong> フォルダに
+        ocean.mp3 / wind.mp3 / river.mp3 / birds.mp3 / leaves.mp3 / rain.mp3 / drips.mp3 /
+        room-tone.mp3 / fire.mp3 / night-forest.mp3 を置いてください。
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    const scenes = [
+      {
+        id: 'beach',
+        title: '星空が綺麗な南の島の砂浜',
+        description: '静かな夜の浜辺。やわらかな波音と、空いっぱいの星のきらめき。',
+        summary: '波音・星空・南の島',
+        defaults: ['ocean', 'wind']
+      },
+      {
+        id: 'river',
+        title: '小さな川のせせらぎと小鳥の囀り',
+        description: '透明な流れと緑の空気。水音の上に、やさしい小鳥の声がほどけていきます。',
+        summary: '川のせせらぎ・小鳥',
+        defaults: ['river', 'birds', 'leaves']
+      },
+      {
+        id: 'rainHouse',
+        title: '木造の古い民家に降りそそぐ雨',
+        description: '深い木の香りを思わせる古民家。屋根や軒を打つ雨が、心をゆるめます。',
+        summary: '雨音・古民家',
+        defaults: ['rain', 'drips', 'roomTone']
+      },
+      {
+        id: 'camp',
+        title: '山で一人キャンプ、静かな焚き火',
+        description: '澄んだ夜気の中、ひとり焚き火を見つめる。ぱちぱちとした火の音が寄り添います。',
+        summary: '山・キャンプ・焚き火',
+        defaults: ['fire', 'nightForest', 'wind']
+      }
+    ];
+
+    const presets = [
+      { id:'deep-night-beach', name:'Deep Night Beach', desc:'波 + 風', sceneId:'beach', mix:{ ocean:0.78, wind:0.22 } },
+      { id:'forest-stream', name:'Forest Stream', desc:'川 + 小鳥 + 葉擦れ', sceneId:'river', mix:{ river:0.66, birds:0.26, leaves:0.18 } },
+      { id:'old-house-rain', name:'Old House Rain', desc:'雨 + 滴 + 室内空気', sceneId:'rainHouse', mix:{ rain:0.70, drips:0.22, roomTone:0.14 } },
+      { id:'solo-campfire', name:'Solo Campfire', desc:'焚き火 + 夜の森 + 風', sceneId:'camp', mix:{ fire:0.62, nightForest:0.18, wind:0.12 } }
+    ];
+
+    const tracks = [
+      { id:'ocean',       name:'波音',         desc:'海のうねりと寄せ波',           defaultVol:0.72, files:['audio/ocean.mp3','ocean.mp3'] },
+      { id:'wind',        name:'風',           desc:'海辺や山のやわらかな風',       defaultVol:0.24, files:['audio/wind.mp3','wind.mp3'] },
+      { id:'river',       name:'川のせせらぎ', desc:'近くで流れる小川',             defaultVol:0.66, files:['audio/river.mp3','river.mp3'] },
+      { id:'birds',       name:'小鳥の囀り',   desc:'森の小鳥や朝のさえずり',       defaultVol:0.26, files:['audio/birds.mp3','birds.mp3'] },
+      { id:'leaves',      name:'葉擦れ',       desc:'木々のかすかなざわめき',       defaultVol:0.18, files:['audio/leaves.mp3','leaves.mp3'] },
+      { id:'rain',        name:'雨音',         desc:'屋根を打つ雨',                 defaultVol:0.70, files:['audio/rain.mp3','rain.mp3'] },
+      { id:'drips',       name:'軒先の滴',     desc:'近くで落ちるしずく',           defaultVol:0.22, files:['audio/drips.mp3','drips.mp3'] },
+      { id:'roomTone',    name:'室内の静けさ', desc:'古民家の内側の空気感',         defaultVol:0.14, files:['audio/room-tone.mp3','room-tone.mp3'] },
+      { id:'fire',        name:'焚き火',       desc:'薪のはぜる音',                 defaultVol:0.62, files:['audio/fire.mp3','fire.mp3'] },
+      { id:'nightForest', name:'夜の森',       desc:'山の夜気と遠い虫の音',         defaultVol:0.18, files:['audio/night-forest.mp3','night-forest.mp3'] }
+    ];
+
+    const state = {
+      currentScene: 'beach',
+      currentPreset: '',
+      master: 0.8,
+      started: false,
+      tracks: Object.fromEntries(tracks.map(t => [t.id, {
+        enabled: false,
+        volume: t.defaultVol,
+        loaded: false,
+        loading: false,
+        failed: false,
+        src: ''
+      }]))
+    };
+
+    const audioMap = Object.fromEntries(tracks.map(t => [t.id, null]));
+
+    const sceneTitle = document.getElementById('sceneTitle');
+    const sceneDescription = document.getElementById('sceneDescription');
+    const sceneButtons = document.getElementById('sceneButtons');
+    const presetButtons = document.getElementById('presetButtons');
+    const mixer = document.getElementById('mixer');
+    const masterVolume = document.getElementById('masterVolume');
+    const masterValue = document.getElementById('masterValue');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const canvas = document.getElementById('sceneCanvas');
+    const ctx = canvas.getContext('2d');
+    const statusBadge = document.getElementById('statusBadge');
+    const sceneSign = document.getElementById('sceneSign');
+
+    function setStatus(message, type='warn'){
+      statusBadge.textContent = message;
+      statusBadge.className = `status ${type}`;
+    }
+
+    function resizeCanvas(){
+      const ratio = Math.min(window.devicePixelRatio || 1, 2);
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = Math.floor(rect.width * ratio);
+      canvas.height = Math.floor(rect.height * ratio);
+      ctx.setTransform(ratio,0,0,ratio,0,0);
+    }
+
+    function createAudio(src){
+      const audio = new Audio(src);
+      audio.loop = true;
+      audio.preload = 'auto';
+      audio.playsInline = true;
+      audio.volume = 0;
+      return audio;
+    }
+
+    async function findPlayableSource(candidates){
+      for(const src of candidates){
+        const ok = await new Promise(resolve => {
+          const probe = new Audio();
+          let finished = false;
+          const done = value => {
+            if(finished) return;
+            finished = true;
+            probe.removeAttribute('src');
+            probe.load();
+            resolve(value);
+          };
+          probe.preload = 'metadata';
+          probe.src = src;
+          probe.addEventListener('loadedmetadata', () => done(true), { once:true });
+          probe.addEventListener('canplaythrough', () => done(true), { once:true });
+          probe.addEventListener('error', () => done(false), { once:true });
+          setTimeout(() => done(false), 4000);
+        });
+        if(ok) return src;
+      }
+      return '';
+    }
+
+    async function loadTrack(trackId){
+      const track = tracks.find(t => t.id === trackId);
+      const trackState = state.tracks[trackId];
+      if(!track || !trackState || trackState.loading || trackState.loaded){
+        return trackState?.loaded || false;
+      }
+
+      trackState.loading = true;
+      trackState.failed = false;
+      updateMixerRow(trackId);
+
+      const src = await findPlayableSource(track.files);
+      if(!src){
+        trackState.loading = false;
+        trackState.failed = true;
+        trackState.loaded = false;
+        updateMixerRow(trackId);
+        setStatus('一部の音声ファイルが見つかりません', 'error');
+        return false;
+      }
+
+      const audio = createAudio(src);
+      audioMap[trackId] = audio;
+      trackState.src = src;
+
+      await new Promise(resolve => {
+        let done = false;
+        const finish = () => {
+          if(done) return;
+          done = true;
+          resolve();
+        };
+        audio.addEventListener('canplaythrough', finish, { once:true });
+        audio.addEventListener('loadedmetadata', finish, { once:true });
+        audio.addEventListener('error', finish, { once:true });
+        audio.load();
+        setTimeout(finish, 4000);
+      });
+
+      trackState.loading = false;
+      trackState.loaded = true;
+      trackState.failed = false;
+      updateMixerRow(trackId);
+      setStatus('音声ファイルを準備しました', 'ok');
+      return true;
+    }
+
+    async function ensureEnabledTracksLoaded(){
+      const ids = tracks.filter(t => state.tracks[t.id].enabled).map(t => t.id);
+      await Promise.all(ids.map(loadTrack));
+    }
+
+    async function fadeAudio(audio, target, duration = 500){
+      if(!audio) return;
+      const start = audio.volume;
+      const diff = target - start;
+      const startTime = performance.now();
+      return new Promise(resolve => {
+        function step(now){
+          const progress = Math.min(1, (now - startTime) / duration);
+          audio.volume = Math.max(0, Math.min(1, start + diff * progress));
+          if(progress < 1) requestAnimationFrame(step);
+          else resolve();
+        }
+        requestAnimationFrame(step);
+      });
+    }
+
+    async function syncTrackPlayback(trackId){
+      const trackState = state.tracks[trackId];
+      const audio = audioMap[trackId];
+      if(!audio || !trackState.loaded) return;
+
+      const target = state.started && trackState.enabled
+        ? trackState.volume * state.master
+        : 0;
+
+      if(target > 0){
+        try{ await audio.play(); } catch(_){}
+      }
+
+      await fadeAudio(audio, target, 500);
+
+      if(target === 0){
+        setTimeout(() => {
+          if(audio && audio.volume === 0 && (!state.started || !trackState.enabled)){
+            audio.pause();
+          }
+        }, 600);
+      }
+    }
+
+    async function refreshPlayback(){
+      for(const t of tracks){
+        if(state.tracks[t.id].enabled && !state.tracks[t.id].loaded){
+          await loadTrack(t.id);
+        }
+      }
+      for(const t of tracks){
+        await syncTrackPlayback(t.id);
+      }
+    }
+
+    function setScene(sceneId, applyDefaultTracks = true){
+      state.currentScene = sceneId;
+      const scene = scenes.find(s => s.id === sceneId);
+      sceneTitle.textContent = scene.title;
+      sceneDescription.textContent = scene.description;
+
+      document.querySelectorAll('.scene-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.scene === sceneId);
+      });
+
+      sceneSign.classList.remove('beach','river','rainHouse','camp');
+      sceneSign.classList.add(sceneId);
+
+      if(applyDefaultTracks){
+        for(const t of tracks) state.tracks[t.id].enabled = false;
+        for(const id of scene.defaults){
+          if(state.tracks[id]) state.tracks[id].enabled = true;
+        }
+        state.currentPreset = '';
+        updatePresetUI();
+        updateMixerUI();
+        refreshPlayback();
+      }
+    }
+
+    function applyPreset(presetId){
+      const preset = presets.find(p => p.id === presetId);
+      if(!preset) return;
+
+      state.currentPreset = presetId;
+      setScene(preset.sceneId, false);
+
+      for(const t of tracks) state.tracks[t.id].enabled = false;
+      for(const [trackId, volume] of Object.entries(preset.mix)){
+        if(state.tracks[trackId]){
+          state.tracks[trackId].enabled = true;
+          state.tracks[trackId].volume = volume;
+        }
+      }
+
+      renderMixer();
+      updatePresetUI();
+      refreshPlayback();
+    }
+
+    function renderSceneButtons(){
+      sceneButtons.innerHTML = '';
+      for(const scene of scenes){
+        const btn = document.createElement('button');
+        btn.className = 'scene-btn';
+        btn.dataset.scene = scene.id;
+        btn.innerHTML = `<strong>${scene.title}</strong><span>${scene.summary}</span>`;
+        btn.addEventListener('click', () => setScene(scene.id, true));
+        sceneButtons.appendChild(btn);
+      }
+    }
+
+    function renderPresetButtons(){
+      presetButtons.innerHTML = '';
+      for(const preset of presets){
+        const btn = document.createElement('button');
+        btn.className = 'preset-btn';
+        btn.dataset.preset = preset.id;
+        btn.innerHTML = `<strong>${preset.name}</strong><span>${preset.desc}</span>`;
+        btn.addEventListener('click', () => applyPreset(preset.id));
+        presetButtons.appendChild(btn);
+      }
+    }
+
+    function updatePresetUI(){
+      document.querySelectorAll('.preset-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.preset === state.currentPreset);
+      });
+    }
+
+    function createToggle(on){
+      const el = document.createElement('button');
+      el.className = 'toggle' + (on ? ' on' : '');
+      return el;
+    }
+
+    function renderMixer(){
+      mixer.innerHTML = '';
+      for(const t of tracks){
+        const row = document.createElement('div');
+        row.className = 'track';
+        row.dataset.track = t.id;
+
+        const top = document.createElement('div');
+        top.className = 'track-top';
+
+        const toggle = createToggle(state.tracks[t.id].enabled);
+        toggle.addEventListener('click', async () => {
+          state.tracks[t.id].enabled = !state.tracks[t.id].enabled;
+          if(state.tracks[t.id].enabled) await loadTrack(t.id);
+          updateMixerUI();
+          refreshPlayback();
+        });
+
+        const text = document.createElement('div');
+        text.innerHTML = `
+          <label>${t.name}</label>
+          <small>${t.desc}</small>
+          <div class="tiny" id="file-${t.id}">待機中</div>
+        `;
+
+        const value = document.createElement('div');
+        value.className = 'value';
+        value.id = `value-${t.id}`;
+        value.textContent = `${Math.round(state.tracks[t.id].volume * 100)}%`;
+
+        top.append(toggle, text, value);
+
+        const range = document.createElement('input');
+        range.type = 'range';
+        range.min = '0';
+        range.max = '100';
+        range.value = Math.round(state.tracks[t.id].volume * 100);
+        range.addEventListener('input', () => {
+          state.tracks[t.id].volume = Number(range.value) / 100;
+          value.textContent = `${range.value}%`;
+          refreshPlayback();
+        });
+
+        row.append(top, range);
+        mixer.appendChild(row);
+        updateMixerRow(t.id);
+      }
+    }
+
+    function updateMixerRow(trackId){
+      const stateRow = state.tracks[trackId];
+      const info = document.getElementById(`file-${trackId}`);
+      if(!info || !stateRow) return;
+      if(stateRow.loading) info.textContent = '読み込み中…';
+      else if(stateRow.loaded) info.textContent = `読込済み: ${stateRow.src}`;
+      else if(stateRow.failed) info.textContent = 'ファイル未検出';
+      else info.textContent = '待機中';
+    }
+
+    function updateMixerUI(){
+      document.querySelectorAll('.track').forEach(row => {
+        const id = row.dataset.track;
+        row.querySelector('.toggle').classList.toggle('on', state.tracks[id].enabled);
+      });
+    }
+
+    masterVolume.addEventListener('input', () => {
+      state.master = Number(masterVolume.value) / 100;
+      masterValue.textContent = `${masterVolume.value}%`;
+      refreshPlayback();
+    });
+
+    startBtn.addEventListener('click', async () => {
+      await ensureEnabledTracksLoaded();
+      state.started = true;
+      await refreshPlayback();
+      startBtn.textContent = '再生中';
+      setStatus('安定版で再生中', 'ok');
+    });
+
+    stopBtn.addEventListener('click', async () => {
+      state.started = false;
+      await refreshPlayback();
+      startBtn.textContent = '音を開始';
+      setStatus('停止中', 'warn');
+    });
+
+    const visuals = {
+      stars: Array.from({length:220}, () => ({
+        x:Math.random(),
+        y:Math.random()*0.68,
+        s:Math.random()*2.2 + 0.3,
+        p:Math.random()*Math.PI*2,
+        hue:Math.random()*20
+      })),
+      shootingStars: Array.from({length:4}, () => ({
+        active:false, x:0, y:0, vx:0, vy:0, life:0, maxLife:0
+      })),
+      clouds: Array.from({length:6}, () => ({
+        x:Math.random()*1.2,
+        y:0.08 + Math.random()*0.22,
+        w:120 + Math.random()*180,
+        h:28 + Math.random()*40,
+        sp:0.004 + Math.random()*0.008,
+        a:0.04 + Math.random()*0.05
+      })),
+      birds: Array.from({length:7}, () => ({
+        offset:Math.random()*1000,
+        depth:0.3 + Math.random()*0.7,
+        y:0.18 + Math.random()*0.22
+      })),
+      rainFar: Array.from({length:180}, () => ({
+        x:Math.random(), y:Math.random(), l:8 + Math.random()*14, sp:0.35 + Math.random()*0.9
+      })),
+      rainNear: Array.from({length:130}, () => ({
+        x:Math.random(), y:Math.random(), l:16 + Math.random()*24, sp:0.8 + Math.random()*1.4
+      })),
+      ripples: Array.from({length:10}, () => ({
+        x:0, y:0, r:0, a:0, active:false
+      })),
+      embers: Array.from({length:50}, () => ({
+        x:Math.random()*2 - 1, y:Math.random(), sp:0.2 + Math.random()*0.9, s:1 + Math.random()*3.5
+      })),
+      flameNoise: Array.from({length:24}, (_,i) => ({
+        offset:i * 0.27 + Math.random()*2
+      }))
+    };
+
+    function maybeSpawnShootingStar(w, h){
+      const idle = visuals.shootingStars.find(s => !s.active);
+      if(!idle) return;
+      if(Math.random() < 0.003){
+        idle.active = true;
+        idle.x = w * (0.55 + Math.random()*0.35);
+        idle.y = h * (0.08 + Math.random()*0.18);
+        idle.vx = -8 - Math.random()*5;
+        idle.vy = 4 + Math.random()*3;
+        idle.life = 0;
+        idle.maxLife = 35 + Math.random()*20;
+      }
+    }
+
+    function drawSkyGradient(w,h,top,bottom){
+      const g = ctx.createLinearGradient(0,0,0,h);
+      g.addColorStop(0, top);
+      g.addColorStop(1, bottom);
+      ctx.fillStyle = g;
+      ctx.fillRect(0,0,w,h);
+    }
+
+    function drawPalm(x,y,scale,lean,t){
+      ctx.save();
+      ctx.translate(x,y);
+      ctx.rotate(lean);
+      ctx.strokeStyle = '#3a2616';
+      ctx.lineWidth = 16 * scale;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(0,0);
+      ctx.quadraticCurveTo(-20*scale,-110*scale,12*scale,-220*scale);
+      ctx.stroke();
+
+      const topX = 12 * scale;
+      const topY = -220 * scale;
+      for(let i=0;i<7;i++){
+        const ang = -1.35 + i*0.45 + Math.sin(t*0.0014 + i)*0.06;
+        ctx.save();
+        ctx.translate(topX, topY);
+        ctx.rotate(ang);
+        ctx.strokeStyle = '#214f30';
+        ctx.lineWidth = 5 * scale;
+        ctx.beginPath();
+        ctx.moveTo(0,0);
+        for(let j=0;j<8;j++){
+          const xx = j * 18 * scale;
+          const yy = Math.sin(j*0.7 + t*0.0012) * 8 * scale;
+          ctx.lineTo(xx, yy);
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
+      ctx.restore();
+    }
+
+    function drawBeach(t,w,h){
+      drawSkyGradient(w,h,'#061123','#0d2040');
+
+      for(const c of visuals.clouds){
+        const x = ((c.x + t * c.sp * 0.0008) % 1.25) * w - c.w;
+        const y = c.y * h;
+        const g = ctx.createRadialGradient(x, y, 10, x, y, c.w);
+        g.addColorStop(0, `rgba(255,255,255,${c.a})`);
+        g.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.ellipse(x, y, c.w, c.h, 0, 0, Math.PI*2);
+        ctx.fill();
+      }
+
+      const moonGlow = ctx.createRadialGradient(w*0.78, h*0.22, 2, w*0.78, h*0.22, h*0.18);
+      moonGlow.addColorStop(0,'rgba(255,245,220,0.28)');
+      moonGlow.addColorStop(1,'rgba(255,245,220,0)');
+      ctx.fillStyle = moonGlow;
+      ctx.fillRect(0,0,w,h);
+
+      for(const s of visuals.stars){
+        const a = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t*0.001 + s.p));
+        ctx.fillStyle = `rgba(${245+s.hue},${245+s.hue},255,${a})`;
+        ctx.beginPath();
+        ctx.arc(s.x*w, s.y*h, s.s, 0, Math.PI*2);
+        ctx.fill();
+      }
+
+      maybeSpawnShootingStar(w,h);
+      visuals.shootingStars.forEach(star => {
+        if(!star.active) return;
+        star.life += 1;
+        star.x += star.vx;
+        star.y += star.vy;
+        const alpha = 1 - (star.life / star.maxLife);
+
+        ctx.strokeStyle = `rgba(255,255,255,${alpha*0.9})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(star.x, star.y);
+        ctx.lineTo(star.x - star.vx*2.8, star.y - star.vy*2.8);
+        ctx.stroke();
+
+        ctx.fillStyle = `rgba(255,245,220,${alpha})`;
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, 2.2, 0, Math.PI*2);
+        ctx.fill();
+
+        if(star.life >= star.maxLife) star.active = false;
+      });
+
+      ctx.fillStyle = 'rgba(252,244,220,0.95)';
+      ctx.beginPath();
+      ctx.arc(w*0.78, h*0.22, h*0.04, 0, Math.PI*2);
+      ctx.fill();
+
+      const seaY = h*0.58;
+      const seaGrad = ctx.createLinearGradient(0, seaY, 0, h);
+      seaGrad.addColorStop(0,'#0b3660');
+      seaGrad.addColorStop(1,'#04111f');
+      ctx.fillStyle = seaGrad;
+      ctx.fillRect(0, seaY, w, h-seaY);
+
+      for(let i=0;i<6;i++){
+        ctx.beginPath();
+        const y = seaY + i*24 + Math.sin(t*0.001 + i)*3;
+        for(let x=-20;x<=w+20;x+=10){
+          const yy = y + Math.sin((x*0.025) + t*0.0018 + i*0.7) * (4 + i*1.2);
+          if(x === -20) ctx.moveTo(x,yy);
+          else ctx.lineTo(x,yy);
+        }
+        ctx.strokeStyle = `rgba(190,234,255,${0.09 + i*0.028})`;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
+      const reflection = ctx.createLinearGradient(0,h*0.22,0,h*0.58);
+      reflection.addColorStop(0,'rgba(255,245,220,0.12)');
+      reflection.addColorStop(1,'rgba(255,245,220,0)');
+      ctx.fillStyle = reflection;
+      ctx.beginPath();
+      ctx.moveTo(w*0.74,h*0.26);
+      ctx.lineTo(w*0.82,h*0.26);
+      ctx.lineTo(w*0.87,h*0.58);
+      ctx.lineTo(w*0.69,h*0.58);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = '#c9b28a';
+      ctx.beginPath();
+      ctx.moveTo(0, h*0.80);
+      ctx.quadraticCurveTo(w*0.3, h*0.74, w*0.55, h*0.81);
+      ctx.quadraticCurveTo(w*0.75, h*0.86, w, h*0.78);
+      ctx.lineTo(w,h);
+      ctx.lineTo(0,h);
+      ctx.closePath();
+      ctx.fill();
+
+      for(let i=0;i<4;i++){
+        const y = h*0.74 + i*18 + Math.sin(t*0.0018 + i)*2;
+        ctx.beginPath();
+        for(let x=-20;x<=w+20;x+=10){
+          const yy = y + Math.sin(x*0.04 + t*0.0022 + i)*4;
+          if(x===-20) ctx.moveTo(x,yy);
+          else ctx.lineTo(x,yy);
+        }
+        ctx.strokeStyle = 'rgba(255,255,255,0.16)';
+        ctx.lineWidth = 2.4;
+        ctx.stroke();
+      }
+
+      drawPalm(w*0.12, h*0.82, 0.9, -0.16, t);
+      drawPalm(w*0.92, h*0.86, 1.08, 0.18, t);
+    }
+
+    function drawBirdShape(x,y,scale){
+      ctx.save();
+      ctx.translate(x,y);
+      ctx.strokeStyle = 'rgba(40,60,50,0.55)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-12*scale,0);
+      ctx.quadraticCurveTo(-5*scale,-8*scale,0,0);
+      ctx.quadraticCurveTo(5*scale,-8*scale,12*scale,0);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawTreeLine(t,w,h){
+      for(let i=0;i<14;i++){
+        const x = i*(w/13);
+        const sway = Math.sin(t*0.0012 + i) * 2;
+        ctx.strokeStyle = '#3a2a18';
+        ctx.lineWidth = 4 + (i % 3);
+        ctx.beginPath();
+        ctx.moveTo(x, h*0.65);
+        ctx.lineTo(x+sway, h*(0.42 + (i%4)*0.02));
+        ctx.stroke();
+
+        ctx.fillStyle = ['#2f703c','#3b8747','#296534'][i%3];
+        ctx.beginPath();
+        ctx.arc(x+sway, h*(0.39 + (i%4)*0.02), 18 + (i%4)*6, 0, Math.PI*2);
+        ctx.fill();
+      }
+    }
+
+    function drawRiver(t,w,h){
+      drawSkyGradient(w,h,'#cfeeff','#8fd19b');
+
+      const hill = ctx.createLinearGradient(0,h*0.2,0,h*0.6);
+      hill.addColorStop(0,'#5f9d70');
+      hill.addColorStop(1,'#2b5a37');
+      ctx.fillStyle = hill;
+
+      ctx.beginPath();
+      ctx.moveTo(0,h*0.45);
+      ctx.quadraticCurveTo(w*0.18,h*0.28,w*0.34,h*0.42);
+      ctx.quadraticCurveTo(w*0.5,h*0.20,w*0.72,h*0.39);
+      ctx.quadraticCurveTo(w*0.86,h*0.22,w,h*0.34);
+      ctx.lineTo(w,h*0.60);
+      ctx.lineTo(0,h*0.60);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = '#244c2f';
+      ctx.fillRect(0,h*0.60,w,h*0.4);
+
+      ctx.beginPath();
+      ctx.moveTo(w*0.38,h);
+      ctx.bezierCurveTo(w*0.48,h*0.78,w*0.38,h*0.60,w*0.50,h*0.52);
+      ctx.bezierCurveTo(w*0.63,h*0.45,w*0.73,h*0.70,w*0.68,h);
+      ctx.closePath();
+      const river = ctx.createLinearGradient(0,h*0.45,w,h);
+      river.addColorStop(0,'#bdf3ff');
+      river.addColorStop(1,'#4eb4dd');
+      ctx.fillStyle = river;
+      ctx.fill();
+
+      for(let i=0;i<20;i++){
+        const y = h*0.56 + i*16;
+        ctx.beginPath();
+        for(let x=w*0.34;x<w*0.72;x+=8){
+          const yy = y + Math.sin(x*0.05 + t*0.003 + i*0.6) * 3;
+          if(x===w*0.34) ctx.moveTo(x,yy);
+          else ctx.lineTo(x,yy);
+        }
+        ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+
+      for(let i=0;i<visuals.birds.length;i++){
+        const b = visuals.birds[i];
+        const x = ((t*0.015*b.depth + b.offset) % (w+120)) - 60;
+        const y = h*b.y + Math.sin(t*0.003 + i) * 8;
+        drawBirdShape(x,y,0.6 + b.depth*0.6);
+      }
+
+      drawTreeLine(t,w,h);
+    }
+
+    function spawnRipple(w,h){
+      const idle = visuals.ripples.find(r => !r.active);
+      if(!idle) return;
+      idle.active = true;
+      idle.x = w * (0.15 + Math.random()*0.7);
+      idle.y = h * (0.74 + Math.random()*0.22);
+      idle.r = 2;
+      idle.a = 0.22 + Math.random()*0.18;
+    }
+
+    function drawRainHouse(t,w,h){
+      drawSkyGradient(w,h,'#4b5668','#1a2230');
+
+      if(Math.random() < 0.0009){
+        ctx.fillStyle = 'rgba(210,230,255,0.18)';
+        ctx.fillRect(0,0,w,h);
+      }
+
+      ctx.fillStyle = '#1d2832';
+      ctx.fillRect(0,h*0.62,w,h*0.38);
+
+      ctx.fillStyle = '#241a14';
+      ctx.fillRect(w*0.18,h*0.40,w*0.64,h*0.32);
+      ctx.fillStyle = '#3d2718';
+      ctx.beginPath();
+      ctx.moveTo(w*0.14,h*0.44);
+      ctx.lineTo(w*0.50,h*0.24);
+      ctx.lineTo(w*0.86,h*0.44);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = '#8f6e4f';
+      for(let i=0;i<10;i++){
+        ctx.fillRect(w*0.22 + i*(w*0.055), h*0.42, w*0.028, h*0.28);
+      }
+      for(let j=0;j<5;j++){
+        ctx.fillRect(w*0.18, h*0.45 + j*32, w*0.64, 7);
+      }
+
+      ctx.fillStyle = '#15110d';
+      ctx.fillRect(w*0.45,h*0.50,w*0.10,h*0.22);
+      ctx.fillStyle = 'rgba(250,217,143,0.76)';
+      ctx.fillRect(w*0.28,h*0.50,w*0.08,h*0.10);
+      ctx.fillRect(w*0.64,h*0.50,w*0.08,h*0.10);
+
+      const glow = ctx.createRadialGradient(w*0.32,h*0.56,4,w*0.32,h*0.56,120);
+      glow.addColorStop(0,'rgba(255,204,120,0.20)');
+      glow.addColorStop(1,'rgba(255,204,120,0)');
+      ctx.fillStyle = glow;
+      ctx.fillRect(0,0,w,h);
+
+      if(Math.random() < 0.06) spawnRipple(w,h);
+
+      ctx.strokeStyle = 'rgba(180,205,230,0.16)';
+      ctx.lineWidth = 1;
+      visuals.rainFar.forEach(r => {
+        const x = r.x * w;
+        const y = ((r.y + (t*0.00052*r.sp)) % 1.2) * h;
+        ctx.beginPath();
+        ctx.moveTo(x,y);
+        ctx.lineTo(x - 7, y + r.l);
+        ctx.stroke();
+      });
+
+      ctx.strokeStyle = 'rgba(200,230,255,0.34)';
+      ctx.lineWidth = 1.35;
+      visuals.rainNear.forEach(r => {
+        const x = r.x * w;
+        const y = ((r.y + (t*0.00115*r.sp)) % 1.3) * h;
+        ctx.beginPath();
+        ctx.moveTo(x,y);
+        ctx.lineTo(x - 11, y + r.l);
+        ctx.stroke();
+      });
+
+      visuals.ripples.forEach(r => {
+        if(!r.active) return;
+        r.r += 0.85;
+        r.a *= 0.974;
+        ctx.strokeStyle = `rgba(205,225,240,${r.a})`;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.ellipse(r.x, r.y, r.r*1.8, r.r*0.65, 0, 0, Math.PI*2);
+        ctx.stroke();
+        if(r.a < 0.015) r.active = false;
+      });
+
+      ctx.fillStyle = 'rgba(24,31,40,0.32)';
+      ctx.fillRect(0,0,w,h);
+    }
+
+    function flameWidthNoise(i, t){
+      const n = visuals.flameNoise[i];
+      return Math.sin(t*0.010 + n.offset)*8 + Math.sin(t*0.017 + n.offset*1.6)*4;
+    }
+
+    function drawCamp(t,w,h){
+      drawSkyGradient(w,h,'#081427','#162037');
+
+      for(const s of visuals.stars){
+        const a = 0.30 + 0.46 * (0.5 + 0.5 * Math.sin(t*0.001 + s.p));
+        ctx.fillStyle = `rgba(255,255,255,${a})`;
+        ctx.beginPath();
+        ctx.arc(s.x*w, s.y*h*0.8, s.s*0.9, 0, Math.PI*2);
+        ctx.fill();
+      }
+
+      ctx.fillStyle = '#0d1320';
+      ctx.beginPath();
+      ctx.moveTo(0,h*0.62);
+      ctx.lineTo(w*0.18,h*0.42);
+      ctx.lineTo(w*0.34,h*0.62);
+      ctx.lineTo(w*0.50,h*0.36);
+      ctx.lineTo(w*0.68,h*0.62);
+      ctx.lineTo(w*0.85,h*0.46);
+      ctx.lineTo(w,h*0.62);
+      ctx.lineTo(w,h);
+      ctx.lineTo(0,h);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = '#17120f';
+      ctx.fillRect(0,h*0.62,w,h*0.38);
+
+      ctx.fillStyle = '#69584f';
+      ctx.beginPath();
+      ctx.moveTo(w*0.22,h*0.70);
+      ctx.lineTo(w*0.33,h*0.52);
+      ctx.lineTo(w*0.44,h*0.70);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = '#57453d';
+      ctx.beginPath();
+      ctx.moveTo(w*0.33,h*0.52);
+      ctx.lineTo(w*0.53,h*0.66);
+      ctx.lineTo(w*0.44,h*0.70);
+      ctx.closePath();
+      ctx.fill();
+
+      const glow = ctx.createRadialGradient(w*0.63,h*0.72,10,w*0.63,h*0.72,160);
+      glow.addColorStop(0,'rgba(255,220,120,0.58)');
+      glow.addColorStop(0.42,'rgba(255,148,52,0.24)');
+      glow.addColorStop(1,'rgba(255,148,52,0)');
+      ctx.fillStyle = glow;
+      ctx.fillRect(0,0,w,h);
+
+      ctx.strokeStyle = '#5d4130';
+      ctx.lineWidth = 8;
+      ctx.beginPath();
+      ctx.moveTo(w*0.59,h*0.77);
+      ctx.lineTo(w*0.67,h*0.69);
+      ctx.moveTo(w*0.67,h*0.77);
+      ctx.lineTo(w*0.59,h*0.69);
+      ctx.stroke();
+
+      const flameBaseX = w*0.63;
+      const flameBaseY = h*0.76;
+      const flameH = 48 + Math.sin(t*0.014)*7;
+
+      ctx.beginPath();
+      ctx.moveTo(flameBaseX, flameBaseY);
+      for(let i=0;i<12;i++){
+        const p = i/11;
+        const xx = flameBaseX - 28 + p*56 + flameWidthNoise(i,t)*0.5;
+        const yy = flameBaseY - Math.sin(p*Math.PI)*flameH - Math.abs(Math.sin(t*0.022 + i))*5;
+        ctx.lineTo(xx,yy);
+      }
+      ctx.closePath();
+      const flameOuter = ctx.createLinearGradient(0, flameBaseY-flameH, 0, flameBaseY);
+      flameOuter.addColorStop(0,'rgba(255,236,146,0.95)');
+      flameOuter.addColorStop(0.45,'rgba(255,179,71,0.95)');
+      flameOuter.addColorStop(1,'rgba(255,102,32,0.92)');
+      ctx.fillStyle = flameOuter;
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(flameBaseX, flameBaseY-2);
+      for(let i=0;i<10;i++){
+        const p = i/9;
+        const xx = flameBaseX - 16 + p*32 + flameWidthNoise(i+5,t)*0.25;
+        const yy = flameBaseY - 6 - Math.sin(p*Math.PI)*(flameH*0.58) - Math.abs(Math.sin(t*0.03 + i))*3;
+        ctx.lineTo(xx,yy);
+      }
+      ctx.closePath();
+      const flameInner = ctx.createLinearGradient(0, flameBaseY-flameH*0.65, 0, flameBaseY);
+      flameInner.addColorStop(0,'rgba(255,255,205,0.98)');
+      flameInner.addColorStop(0.55,'rgba(255,223,116,0.96)');
+      flameInner.addColorStop(1,'rgba(255,165,60,0.85)');
+      ctx.fillStyle = flameInner;
+      ctx.fill();
+
+      visuals.embers.forEach(e => {
+        const ex = w*0.63 + e.x*34 + Math.sin(t*0.001 + e.y)*4;
+        const ey = h*0.72 - ((t*0.024*e.sp + e.y*120) % 110);
+        const alpha = Math.max(0, 1 - ((h*0.72 - ey) / 110));
+        ctx.fillStyle = `rgba(255,${120 + Math.floor(alpha*90)},40,${alpha*0.9})`;
+        ctx.beginPath();
+        ctx.arc(ex, ey, e.s*alpha, 0, Math.PI*2);
+        ctx.fill();
+      });
+
+      const smoke = ctx.createRadialGradient(w*0.64,h*0.60,10,w*0.64,h*0.60,120);
+      smoke.addColorStop(0,'rgba(180,190,200,0.05)');
+      smoke.addColorStop(1,'rgba(180,190,200,0)');
+      ctx.fillStyle = smoke;
+      ctx.fillRect(0,0,w,h);
+    }
+
+    function animate(ts){
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      ctx.clearRect(0,0,w,h);
+
+      switch(state.currentScene){
+        case 'beach': drawBeach(ts,w,h); break;
+        case 'river': drawRiver(ts,w,h); break;
+        case 'rainHouse': drawRainHouse(ts,w,h); break;
+        case 'camp': drawCamp(ts,w,h); break;
+      }
+
+      requestAnimationFrame(animate);
+    }
+
+    function init(){
+      renderSceneButtons();
+      renderPresetButtons();
+
+      for(const id of scenes.find(s => s.id === 'beach').defaults){
+        state.tracks[id].enabled = true;
+      }
+
+      renderMixer();
+      setScene('beach', false);
+      masterValue.textContent = `${masterVolume.value}%`;
+      updateMixerUI();
+      updatePresetUI();
+      resizeCanvas();
+      requestAnimationFrame(animate);
+      setStatus('音を開始してください', 'warn');
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+    init();
+  </script>
+</body>
+</html>
